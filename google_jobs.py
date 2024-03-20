@@ -1,7 +1,6 @@
 from playwright.async_api import async_playwright
 import asyncio
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 
 async def get_page_source(url):
@@ -26,7 +25,7 @@ async def get_page_source(url):
 
         # Example usage: Scroll within a div with class "zxU94d gws-plugins-horizon-jobs__tl-lvc"
         # Adjust the number of scrolls and scrollHeight as needed
-        for _ in range(5):  # Number of times to scroll
+        for _ in range(15):  # Number of times to scroll
             await scroll_within_div(
                 ".zxU94d.gws-plugins-horizon-jobs__tl-lvc", 500
             )  # Scroll down 500 pixels each time
@@ -46,7 +45,7 @@ def parse_html_with_bs(html_content):
         job_url = div.find("span", attrs={"class": "DaDV9e"})
         try:
             job_url = job_url.find("a").get("href")
-        except:
+        except AttributeError:
             pass
         title = div.find("div", attrs={"class": "BjJfJf PUpOsf"}).text
         company_name = div.find("div", attrs={"class": "vNEEBe"}).text
@@ -62,7 +61,7 @@ def parse_html_with_bs(html_content):
 
         try:
             days_ago = div.find("span", attrs={"class": "LL4CDc"}).find("span").text
-        except:
+        except AttributeError:
             days_ago = "N/A"
 
         # Construct the job list entry
@@ -75,7 +74,8 @@ def parse_html_with_bs(html_content):
 
 
 async def main():
-    url = "https://www.google.com/search?q=help+desk&sca_esv=913347e5f16b5bd8&biw=1912&bih=924&tbs=qdr:w&sxsrf=ACQVn0-XzptyZBbvMOQYfiSwA9QHMCsb5Q:1710901256124&ei=CEj6ZeWKB4Lt5NoPo9SG8Aw&uact=5&oq=jobs&gs_lp=Egxnd3Mtd2l6LXNlcnAiBGpvYnMyChAjGIAEGIoFGCcyCxAAGIAEGLEDGJIDMgsQABiABBiKBRiSAzIUEAAYgAQYigUYkQIYsQMYgwEYyQMyDRAAGIAEGIoFGEMYsQMyChAAGIAEGIoFGEMyChAAGIAEGIoFGEMyERAuGIAEGIoFGJECGMcBGNEDMgoQABiABBiKBRhDMgoQABiABBiKBRhDSJIYUABYwxZwAngAkAEAmAGpAaABmQaqAQMwLja4AQPIAQD4AQGYAgigArsGqAIRwgIXEC4YgAQYigUYkQIYsQMYgwEYxwEY0QPCAhAQLhhDGMcBGNEDGIAEGIoFwgILEAAYgAQYsQMYgwHCAg4QABiABBiKBRixAxiDAcICERAuGIAEGLEDGIMBGMcBGNEDwgIOEC4YgAQYsQMYxwEY0QPCAgQQIxgnwgIKEC4YgAQYigUYQ8ICFhAuGIAEGIoFGEMYsQMYgwEYxwEY0QPCAg4QLhiABBiKBRixAxiDAcICBxAjGOoCGCfCAhMQABiABBiKBRhDGOoCGLQC2AEBwgILEC4YgAQYsQMYgwHCAggQLhiABBixA8ICEBAuGIAEGIoFGEMYxwEYrwHCAggQABiABBiSA5gDB7oGBggBEAEYAZIHAzIuNqAHg4QB&sclient=gws-wiz-serp&ibp=htl;jobs&sa=X&ved=2ahUKEwi1_PTmnYOFAxVeGVkFHRCYB94QutcGKAF6BAgUEAU#fpstate=tldetail&htivrt=jobs&htichips=city:Owg_06VPwoli_nfhBo8LyA%3D%3D&htischips=city;Owg_06VPwoli_nfhBo8LyA%3D%3D:New%20York_comma_%20NY&htidocid=Bp54_2RY361z7YR9AAAAAA%3D%3D"
+    word = "help desk"
+    url = f"https://www.google.com/search?q={word}k&sca_esv=913347e5f16b5bd8&biw=1912&bih=924&tbs=qdr:w&sxsrf=ACQVn0-XzptyZBbvMOQYfiSwA9QHMCsb5Q:1710901256124&ei=CEj6ZeWKB4Lt5NoPo9SG8Aw&uact=5&oq=jobs&gs_lp=Egxnd3Mtd2l6LXNlcnAiBGpvYnMyChAjGIAEGIoFGCcyCxAAGIAEGLEDGJIDMgsQABiABBiKBRiSAzIUEAAYgAQYigUYkQIYsQMYgwEYyQMyDRAAGIAEGIoFGEMYsQMyChAAGIAEGIoFGEMyChAAGIAEGIoFGEMyERAuGIAEGIoFGJECGMcBGNEDMgoQABiABBiKBRhDMgoQABiABBiKBRhDSJIYUABYwxZwAngAkAEAmAGpAaABmQaqAQMwLja4AQPIAQD4AQGYAgigArsGqAIRwgIXEC4YgAQYigUYkQIYsQMYgwEYxwEY0QPCAhAQLhhDGMcBGNEDGIAEGIoFwgILEAAYgAQYsQMYgwHCAg4QABiABBiKBRixAxiDAcICERAuGIAEGLEDGIMBGMcBGNEDwgIOEC4YgAQYsQMYxwEY0QPCAgQQIxgnwgIKEC4YgAQYigUYQ8ICFhAuGIAEGIoFGEMYsQMYgwEYxwEY0QPCAg4QLhiABBiKBRixAxiDAcICBxAjGOoCGCfCAhMQABiABBiKBRhDGOoCGLQC2AEBwgILEC4YgAQYsQMYgwHCAggQLhiABBixA8ICEBAuGIAEGIoFGEMYxwEYrwHCAggQABiABBiSA5gDB7oGBggBEAEYAZIHAzIuNqAHg4QB&sclient=gws-wiz-serp&ibp=htl;jobs&sa=X&ved=2ahUKEwi1_PTmnYOFAxVeGVkFHRCYB94QutcGKAF6BAgUEAU#fpstate=tldetail&htivrt=jobs&htichips=city:Owg_06VPwoli_nfhBo8LyA%3D%3D&htischips=city;Owg_06VPwoli_nfhBo8LyA%3D%3D:New%20York_comma_%20NY&htidocid=Bp54_2RY361z7YR9AAAAAA%3D%3D"
     html_content = await get_page_source(url)
     job_list = parse_html_with_bs(html_content)
     for job in job_list:
