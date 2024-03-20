@@ -36,25 +36,24 @@ def parse_html_with_bs(html_content):
         location = div.find("div", attrs={"class": "Qk80Jf"}).text
         location = location.split(",", 1)[0].strip()
 
-        # Check for specific div and extract salary if present
         salary_div = div.find("div", class_="I2Cbhb bSuYSc")
+        salary = None  # Initialize salary as None to check later
         if salary_div:
             salary_info = salary_div.find("span", class_="LL4CDc")
             if salary_info:
                 salary = "$" + salary_info.text.strip()
-            else:
-                salary = "N/A"
-        else:
-            salary = "N/A"
 
         try:
             days_ago = div.find("span", attrs={"class": "LL4CDc"}).find("span").text
         except:
             days_ago = "N/A"
 
-        job_list.append(
-            [title, company_name, location, job_url, salary, days_ago, "Google Jobs"]
-        )
+        # Construct the job list entry
+        job_entry = [title, company_name, location, job_url, days_ago, "Google Jobs"]
+        if salary:
+            job_entry.insert(4, salary)  # Insert salary before 'days_ago' if it exists
+
+        job_list.append(job_entry)
     return job_list
 
 
