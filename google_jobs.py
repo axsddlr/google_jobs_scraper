@@ -37,7 +37,7 @@ async def get_page_source(url):
 
 
 def parse_html_with_bs(html_content):
-    soup = BeautifulSoup(html_content, "html.parser")
+    soup = BeautifulSoup(html_content, "lxml")
     job_list = []
     for div in soup.find_all(
         name="li", attrs={"class": "iFjolb gws-plugins-horizon-jobs__li-ed"}
