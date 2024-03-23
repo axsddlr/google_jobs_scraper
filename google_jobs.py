@@ -10,6 +10,8 @@ GJOBS_URL = "https://www.google.com/search?q={}&ibp=htl;jobs"
 GJOBS_URL_TODAY_SUBSTRING = (
     "#htivrt=jobs&htichips=date_posted:today&htischips=date_posted;today"
 )
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+
 OUTPUT_FILE_DIR = "job_scrape_master.json"
 THRESHOLD = 10
 CAP = 50
@@ -34,7 +36,7 @@ class css_selector:
     result_title = '[class*="Fol1qc"]'
     publisher = "[class*=vNEEBe]"
     details = "[class*=I2Cbhb]"
-    apply_link_cards = "[class*=DaDV9e]"
+    apply_link_cards = "span > a.pMhGee.Co68jc.j0vryd"
 
 
 def scroll_element_into_view_and_click(element):
@@ -58,7 +60,9 @@ def show_full_job_description(job_desc_card):
 def create_browser_context():
     playwright = sync_playwright().start()
     browser = playwright.chromium.launch(headless=True)
-    context = browser.new_context(viewport={"width": 1920, "height": 1080})
+    context = browser.new_context(
+        user_agent=user_agent, viewport={"width": 1920, "height": 1080}
+    )
     context.set_default_timeout(10000)
     return context
 
@@ -135,24 +139,26 @@ def unpack_details(details):
 
 def scrape_job(timekeeper, desc_card):
     scrape_time = timekeeper.now
-    job_title = (
-        desc_card.query_selector(css_selector.title_tag).text_content().split("\n")[0]
+    job_title = desc_card.query_selector(css_selector.title_tag).text_content().strip()
+    publisher = (
+        desc_card.query_selector(css_selector.publisher_tag).text_content().strip()
     )
-    pbctry = desc_card.query_selector(css_selector.publisher_tag).text_content()
-    publisher = pbctry.split("\n")[0]
-    job_desc = desc_card.query_selector(css_selector.job_desc_tag).text_content()
+    job_desc = (
+        desc_card.query_selector(css_selector.job_desc_tag).text_content().strip()
+    )
     details_elements = desc_card.query_selector_all(css_selector.details)
     time_posted, salary, job_type = unpack_details(details_elements)
 
-    apply_links_element = desc_card.query_selector(css_selector.apply_link_cards)
-    if apply_links_element:
-        application_link = [
-            x.get_attribute("href")
-            for x in apply_links_element.query_selector_all("a")
-            if x.text_content().startswith("Apply on")
-        ]
-    else:
-        application_link = []
+    application_links = []
+    apply_link_elements = desc_card.query_selector_all(css_selector.apply_link_cards)
+    for link_element in apply_link_elements:
+        href = link_element.get_attribute("href")
+        platform_name = (
+            link_element.text_content().split("Apply on ")[-1].strip()
+            if "Apply on " in link_element.text_content()
+            else "Unknown Platform"
+        )
+        application_links.append({"url": href, "platform": platform_name})
 
     job_data = {
         "scrape_time": scrape_time,
@@ -162,7 +168,7 @@ def scrape_job(timekeeper, desc_card):
         "salary": salary,
         "job_type": job_type,
         "desc": job_desc,
-        "application_link": application_link,
+        "application_links": application_links,
     }
 
     return job_data
