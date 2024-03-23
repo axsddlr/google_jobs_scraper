@@ -1,85 +1,188 @@
-from playwright.async_api import async_playwright
-import asyncio
-from bs4 import BeautifulSoup
+import json
+import datetime
+import logging
+import time
+import random
+import argparse
+from playwright.sync_api import sync_playwright
+
+GJOBS_URL = "https://www.google.com/search?q={}&ibp=htl;jobs"
+GJOBS_URL_TODAY_SUBSTRING = (
+    "#htivrt=jobs&htichips=date_posted:today&htischips=date_posted;today"
+)
+OUTPUT_FILE_DIR = "job_scrape_master.json"
+THRESHOLD = 10
+CAP = 50
 
 
-async def get_page_source(url):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            viewport={"width": 1280, "height": 720},
-            java_script_enabled=True,
+class TimeKeeper:
+    @property
+    def now(self):
+        """
+        return the current correct date and time using the format specified
+        """
+        return f"{datetime.datetime.now():%d-%b-%Y T%I:%M}"
+
+
+class css_selector:
+    jobs_cards = "li"
+    job_desc_card_visible = '[id="tl_ditc"]'
+    job_full_desc_button = '[class="atHusc"]'
+    job_desc_tag = "[class*=HBvzbc]"
+    title_tag = "[class*=sH3zFd]"
+    publisher_tag = "[class*=tJ9zfc]"
+    result_title = '[class*="Fol1qc"]'
+    publisher = "[class*=vNEEBe]"
+    details = "[class*=I2Cbhb]"
+    apply_link_cards = "[class*=DaDV9e]"
+
+
+def scroll_element_into_view_and_click(element):
+    # Ensure the element is visible in the viewport
+    element.scroll_into_view_if_needed()
+    # Click the element
+    element.click()
+
+
+def show_full_job_description(job_desc_card):
+    try:
+        full_desc_button = job_desc_card.query_selector(
+            css_selector.job_full_desc_button
         )
-        page = await context.new_page()
-        await page.goto(url, wait_until="networkidle")
-
-        # Function to scroll within a specific <div>
-        async def scroll_within_div(selector, scrollHeight):
-            await page.evaluate(f"""
-            const div = document.querySelector('{selector}');
-            if (div) {{
-                div.scrollTop += {scrollHeight};
-            }}
-            """)
-
-        # Example usage: Scroll within a div with class "zxU94d gws-plugins-horizon-jobs__tl-lvc"
-        # Adjust the number of scrolls and scrollHeight as needed
-        for _ in range(15):  # Number of times to scroll
-            await scroll_within_div(
-                ".zxU94d.gws-plugins-horizon-jobs__tl-lvc", 500
-            )  # Scroll down 500 pixels each time
-            await page.wait_for_timeout(2000)  # Wait for 2 seconds for content to load
-
-        html_content = await page.content()  # Get HTML content of the page
-        await browser.close()
-        return html_content
+        if full_desc_button:
+            full_desc_button.click()
+    except Exception:
+        return
 
 
-def parse_html_with_bs(html_content):
-    soup = BeautifulSoup(html_content, "lxml")
-    job_list = []
-    for div in soup.find_all(
-        name="li", attrs={"class": "iFjolb gws-plugins-horizon-jobs__li-ed"}
-    ):
-        job_url = div.find("span", attrs={"class": "DaDV9e"})
-        try:
-            job_url = job_url.find("a").get("href")
-        except AttributeError:
-            pass
-        title = div.find("div", attrs={"class": "BjJfJf PUpOsf"}).text
-        company_name = div.find("div", attrs={"class": "vNEEBe"}).text
-        location = div.find("div", attrs={"class": "Qk80Jf"}).text
-        location = location.split(",", 1)[0].strip()
-
-        salary_div = div.find("div", class_="I2Cbhb bSuYSc")
-        salary = None  # Initialize salary as None to check later
-        if salary_div:
-            salary_info = salary_div.find("span", class_="LL4CDc")
-            if salary_info:
-                salary = "$" + salary_info.text.strip()
-
-        try:
-            days_ago = div.find("span", attrs={"class": "LL4CDc"}).find("span").text
-        except AttributeError:
-            days_ago = "N/A"
-
-        # Construct the job list entry
-        job_entry = [title, company_name, location, job_url, days_ago, "Google Jobs"]
-        if salary:
-            job_entry.insert(4, salary)  # Insert salary before 'days_ago' if it exists
-
-        job_list.append(job_entry)
-    return job_list
+def create_browser_context():
+    playwright = sync_playwright().start()
+    browser = playwright.chromium.launch(headless=True)
+    context = browser.new_context(viewport={"width": 1920, "height": 1080})
+    context.set_default_timeout(10000)
+    return context
 
 
-async def main():
-    word = "help desk"
-    url = f"https://www.google.com/search?q={word}k&sca_esv=913347e5f16b5bd8&biw=1912&bih=924&tbs=qdr:w&sxsrf=ACQVn0-XzptyZBbvMOQYfiSwA9QHMCsb5Q:1710901256124&ei=CEj6ZeWKB4Lt5NoPo9SG8Aw&uact=5&oq=jobs&gs_lp=Egxnd3Mtd2l6LXNlcnAiBGpvYnMyChAjGIAEGIoFGCcyCxAAGIAEGLEDGJIDMgsQABiABBiKBRiSAzIUEAAYgAQYigUYkQIYsQMYgwEYyQMyDRAAGIAEGIoFGEMYsQMyChAAGIAEGIoFGEMyChAAGIAEGIoFGEMyERAuGIAEGIoFGJECGMcBGNEDMgoQABiABBiKBRhDMgoQABiABBiKBRhDSJIYUABYwxZwAngAkAEAmAGpAaABmQaqAQMwLja4AQPIAQD4AQGYAgigArsGqAIRwgIXEC4YgAQYigUYkQIYsQMYgwEYxwEY0QPCAhAQLhhDGMcBGNEDGIAEGIoFwgILEAAYgAQYsQMYgwHCAg4QABiABBiKBRixAxiDAcICERAuGIAEGLEDGIMBGMcBGNEDwgIOEC4YgAQYsQMYxwEY0QPCAgQQIxgnwgIKEC4YgAQYigUYQ8ICFhAuGIAEGIoFGEMYsQMYgwEYxwEY0QPCAg4QLhiABBiKBRixAxiDAcICBxAjGOoCGCfCAhMQABiABBiKBRhDGOoCGLQC2AEBwgILEC4YgAQYsQMYgwHCAggQLhiABBixA8ICEBAuGIAEGIoFGEMYxwEYrwHCAggQABiABBiSA5gDB7oGBggBEAEYAZIHAzIuNqAHg4QB&sclient=gws-wiz-serp&ibp=htl;jobs&sa=X&ved=2ahUKEwi1_PTmnYOFAxVeGVkFHRCYB94QutcGKAF6BAgUEAU#fpstate=tldetail&htivrt=jobs&htichips=city:Owg_06VPwoli_nfhBo8LyA%3D%3D&htischips=city;Owg_06VPwoli_nfhBo8LyA%3D%3D:New%20York_comma_%20NY&htidocid=Bp54_2RY361z7YR9AAAAAA%3D%3D"
-    html_content = await get_page_source(url)
-    job_list = parse_html_with_bs(html_content)
-    for job in job_list:
-        print(job)
+def nap(secs=random.randint(0, 5)):
+    """
+    sleeps the bot for specified number of seconds
+    """
+    logging.info(f"Napping for {secs} seconds")
+    print("nap for {} seconds".format(secs))
+    time.sleep(secs)
 
 
-asyncio.run(main())
+def get_jobs(page):
+    timekeeper = TimeKeeper()
+    job_cards = page.query_selector_all(css_selector.jobs_cards)
+    scraped_jobs = []
+
+    if job_cards:
+        count = 1
+        while True:
+            try:
+                card = job_cards[count - 1]
+                scroll_element_into_view_and_click(card)
+            except IndexError:
+                break
+
+            job_desc_card = page.query_selector(css_selector.job_desc_card_visible)
+            show_full_job_description(job_desc_card)
+            job_data = scrape_job(timekeeper, job_desc_card)
+            if job_data:
+                scraped_jobs.append(job_data)
+
+            if (count % THRESHOLD) == 0:
+                nap(random.randint(1, 6))
+                job_cards = page.query_selector_all(css_selector.jobs_cards)
+
+            if count == len(job_cards):
+                logging.info("\aNew data isn't coming in.")
+                break
+
+            if count == CAP:
+                break
+
+            count += 1
+
+    with open(OUTPUT_FILE_DIR, "w") as outfile:
+        json.dump(scraped_jobs, outfile, indent=4)
+
+
+def unpack_details(details):
+    # Initialize default values for time_posted, salary, and job_type
+    time_posted = ""
+    salary = ""
+    job_type = ""
+
+    if len(details) == 0:
+        return time_posted, salary, job_type
+    if len(details) == 1:
+        time_posted = details[0].text_content()
+    elif len(details) == 2:
+        time_posted = details[0].text_content()
+        salary = details[1].text_content()
+    elif len(details) >= 3:
+        time_posted = details[0].text_content()
+        if details[1].text_content().endswith("mins"):
+            job_type = details[2].text_content()
+        else:
+            salary = details[1].text_content()
+            job_type = details[2].text_content()
+
+    return time_posted, salary, job_type
+
+
+def scrape_job(timekeeper, desc_card):
+    scrape_time = timekeeper.now
+    job_title = (
+        desc_card.query_selector(css_selector.title_tag).text_content().split("\n")[0]
+    )
+    pbctry = desc_card.query_selector(css_selector.publisher_tag).text_content()
+    publisher = pbctry.split("\n")[0]
+    job_desc = desc_card.query_selector(css_selector.job_desc_tag).text_content()
+    details_elements = desc_card.query_selector_all(css_selector.details)
+    time_posted, salary, job_type = unpack_details(details_elements)
+
+    apply_links_element = desc_card.query_selector(css_selector.apply_link_cards)
+    if apply_links_element:
+        application_link = [
+            x.get_attribute("href")
+            for x in apply_links_element.query_selector_all("a")
+            if x.text_content().startswith("Apply on")
+        ]
+    else:
+        application_link = []
+
+    job_data = {
+        "scrape_time": scrape_time,
+        "job_title": job_title,
+        "publisher": publisher,
+        "time_posted": time_posted,
+        "salary": salary,
+        "job_type": job_type,
+        "desc": job_desc,
+        "application_link": application_link,
+    }
+
+    return job_data
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--search_term", type=str, help="job term to search for")
+parser.add_argument(
+    "--limit", type=int, help="maximum number of jobs to scrape", default=200
+)
+parser.add_argument("--is_today", type=str, help="only scrape jobs posted today")
+args = parser.parse_args()
+CAP = args.limit
+
+context = create_browser_context()
+page = context.new_page()
+search_term = "data engineer"
+search_page_url = GJOBS_URL.format(args.search_term)
+if args.is_today == "True":
+    search_page_url += GJOBS_URL_TODAY_SUBSTRING
+page.goto(search_page_url)
+get_jobs(page)
+context.close()
