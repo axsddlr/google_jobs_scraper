@@ -119,22 +119,26 @@ def unpack_details(details_elements):
     time_posted = "Not specified"
     salary = "Not specified"
     job_type = "Not specified"
+    benefits = []
 
     for detail in details_elements:
+        # Using the direct text content since aria-hidden does not contain the descriptive text
         text_content = detail.text_content().strip()
-        if "ago" in text_content:
+
+        # Identifying the type of detail based on known keywords
+        if "ago" in text_content or "Posted" in text_content:
             time_posted = text_content
-        elif "year" in text_content or "month" in text_content:
+        elif any(keyword in text_content for keyword in ["K a year", "an hour"]):
             salary = text_content
-        elif (
-            "time" in text_content
-            or "part-time" in text_content
-            or "full-time" in text_content
+        elif any(
+            keyword in text_content
+            for keyword in ["Full-time", "Part-time", "Contractor"]
         ):
             job_type = text_content
-        # Add more conditions here if there are other types of details to extract
+        else:
+            benefits.append(text_content)  # Assume other texts might relate to benefits
 
-    return time_posted, salary, job_type
+    return time_posted, salary, job_type, benefits
 
 
 def scrape_job(timekeeper, desc_card):
@@ -152,7 +156,6 @@ def scrape_job(timekeeper, desc_card):
         desc_card.query_selector(css_selector.job_desc_tag).text_content().strip()
     )
     details_elements = desc_card.query_selector_all(css_selector.details)
-    time_posted, salary, job_type = unpack_details(details_elements)
 
     application_links = []
     apply_link_elements = desc_card.query_selector_all(css_selector.apply_link_cards)
@@ -165,12 +168,15 @@ def scrape_job(timekeeper, desc_card):
         )
         application_links.append({"url": href, "platform": platform_name})
 
+    time_posted, salary, job_type, benefits = unpack_details(details_elements)
+
     job_data = {
         "scrape_time": scrape_time,
         "job_title": job_title,
         "publisher": publisher,
         "time_posted": time_posted,
         "salary": salary.replace("\u2013", "-"),
+        "benefits": benefits,  # Include benefits in job_data
         "job_type": job_type,
         "desc": job_desc,
         "application_links": application_links,
