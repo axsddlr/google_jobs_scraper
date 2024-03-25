@@ -138,7 +138,12 @@ def unpack_details(details_elements):
 
 def scrape_job(timekeeper, desc_card):
     scrape_time = timekeeper.now
-    job_title = desc_card.query_selector(css_selector.title_tag).text_content().strip()
+    job_title_element = desc_card.query_selector("h2.KLsYvd")
+    job_title = (
+        job_title_element.text_content().strip()
+        if job_title_element
+        else "Title not found"
+    )
     publisher = (
         desc_card.query_selector(css_selector.publisher_tag).text_content().strip()
     )
@@ -164,7 +169,7 @@ def scrape_job(timekeeper, desc_card):
         "job_title": job_title,
         "publisher": publisher,
         "time_posted": time_posted,
-        "salary": salary,
+        "salary": salary.replace("\u2013", "-"),
         "job_type": job_type,
         "desc": job_desc,
         "application_links": application_links,
