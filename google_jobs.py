@@ -32,7 +32,7 @@ class css_selector:
     job_full_desc_button = '[class="atHusc"]'
     job_desc_tag = "[class*=HBvzbc]"
     title_tag = "[class*=sH3zFd]"
-    publisher_tag = "[class*=tJ9zfc]"
+    publisher_tag = ".nJlQNd.sMzDkb"
     result_title = '[class*="Fol1qc"]'
     publisher = "[class*=vNEEBe]"
     details = "div.I2Cbhb"
@@ -109,8 +109,9 @@ def get_jobs(page):
 
             count += 1
 
+    output_data = {"search_page_url": search_page_url, "jobs": scraped_jobs}
     with open(OUTPUT_FILE_DIR, "w") as outfile:
-        json.dump(scraped_jobs, outfile, indent=4)
+        json.dump(output_data, outfile, indent=4)
 
 
 def unpack_details(details_elements):
