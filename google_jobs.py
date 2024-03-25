@@ -173,6 +173,15 @@ def scrape_job(timekeeper, desc_card):
     return job_data
 
 
+def format_city_state(city_state):
+    if city_state:
+        city, state = city_state.split(",")
+        city = city.strip().replace(" ", "+")
+        state = state.strip().replace(" ", "+")
+        return f"&htichips=city;{city}_comma_%20{state}"
+    return ""
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--search_term", type=str, help="job term to search for", required=True
@@ -185,6 +194,11 @@ parser.add_argument(
     action="store_true",
     help="Set this flag to only scrape jobs posted today",
 )
+parser.add_argument(
+    "--city_state",
+    type=str,
+    help="City and state for job search, formatted as 'City,State' (e.g., 'New York,NY')",
+)
 
 
 args = parser.parse_args()
@@ -196,6 +210,9 @@ search_term = args.search_term
 search_page_url = GJOBS_URL.format(search_term)
 if args.is_today:
     search_page_url += GJOBS_URL_TODAY_SUBSTRING
+if args.city_state:
+    city_state_substring = format_city_state(args.city_state)
+    search_page_url += city_state_substring
 page.goto(search_page_url)
 get_jobs(page)
 context.close()
