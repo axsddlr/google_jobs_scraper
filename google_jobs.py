@@ -35,7 +35,7 @@ class css_selector:
     publisher_tag = "[class*=tJ9zfc]"
     result_title = '[class*="Fol1qc"]'
     publisher = "[class*=vNEEBe]"
-    details = "[class*=I2Cbhb]"
+    details = "div.I2Cbhb"
     apply_link_cards = "span > a.pMhGee.Co68jc.j0vryd"
 
 
@@ -113,26 +113,25 @@ def get_jobs(page):
         json.dump(scraped_jobs, outfile, indent=4)
 
 
-def unpack_details(details):
-    # Initialize default values for time_posted, salary, and job_type
-    time_posted = ""
-    salary = ""
-    job_type = ""
+def unpack_details(details_elements):
+    # Initialize default values
+    time_posted = "Not specified"
+    salary = "Not specified"
+    job_type = "Not specified"
 
-    if len(details) == 0:
-        return time_posted, salary, job_type
-    if len(details) == 1:
-        time_posted = details[0].text_content()
-    elif len(details) == 2:
-        time_posted = details[0].text_content()
-        salary = details[1].text_content()
-    elif len(details) >= 3:
-        time_posted = details[0].text_content()
-        if details[1].text_content().endswith("mins"):
-            job_type = details[2].text_content()
-        else:
-            salary = details[1].text_content()
-            job_type = details[2].text_content()
+    for detail in details_elements:
+        text_content = detail.text_content().strip()
+        if "ago" in text_content:
+            time_posted = text_content
+        elif "year" in text_content or "month" in text_content:
+            salary = text_content
+        elif (
+            "time" in text_content
+            or "part-time" in text_content
+            or "full-time" in text_content
+        ):
+            job_type = text_content
+        # Add more conditions here if there are other types of details to extract
 
     return time_posted, salary, job_type
 
@@ -175,19 +174,27 @@ def scrape_job(timekeeper, desc_card):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--search_term", type=str, help="job term to search for")
 parser.add_argument(
-    "--limit", type=int, help="maximum number of jobs to scrape", default=200
+    "--search_term", type=str, help="job term to search for", required=True
 )
-parser.add_argument("--is_today", type=str, help="only scrape jobs posted today")
+parser.add_argument(
+    "--limit", type=int, help="maximum number of jobs to scrape", default=50
+)
+parser.add_argument(
+    "--is_today",
+    action="store_true",
+    help="Set this flag to only scrape jobs posted today",
+)
+
+
 args = parser.parse_args()
 CAP = args.limit
 
 context = create_browser_context()
 page = context.new_page()
-search_term = "data engineer"
-search_page_url = GJOBS_URL.format(args.search_term)
-if args.is_today == "True":
+search_term = args.search_term
+search_page_url = GJOBS_URL.format(search_term)
+if args.is_today:
     search_page_url += GJOBS_URL_TODAY_SUBSTRING
 page.goto(search_page_url)
 get_jobs(page)
